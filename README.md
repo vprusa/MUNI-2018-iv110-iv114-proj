@@ -13,6 +13,5 @@ This project is example of pipeline using:
 ### Example
 
 ```
-./pipeline.sh --usePercentsOfFile 0.1 --propertiesFile ./properties-test-local.properties -i ../data/bioD
-ataTest/Project/data/data/SRR6000947_1.fastq.gz -i ../data/bioDataTest/Project/data/data/SRR6000947_2.fastq.gz
+./pipeline.sh --usePercentsOfFile 0.1 --propertiesFile ./properties-test-local.properties -i ./data/SRR6000947_1.fastq.gz -i ./data/SRR6000947_2.fastq.gz
 ```
