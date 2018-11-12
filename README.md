@@ -9,3 +9,10 @@ This project is example of pipeline using:
 - [megan6](http://ab.inf.uni-tuebingen.de/software/megan6/)
 - [Diamond](https://github.com/bbuchfink/diamond/)
 - etc.?
+
+### Example
+
+```
+./pipeline.sh --usePercentsOfFile 0.1 --propertiesFile ./properties-test-local.properties -i ../data/bioD
+ataTest/Project/data/data/SRR6000947_1.fastq.gz -i ../data/bioDataTest/Project/data/data/SRR6000947_2.fastq.gz
+```
