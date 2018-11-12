@@ -165,6 +165,7 @@ function loadWorkspace(){
   fi
   TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
   SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
+  FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/fastqc-results"
 
   echo "CACHE_DIR_PATH: $CACHE_DIR_PATH"
   CACHE_DIR_PATH="${WORKSPACE_PATH}/cache"
@@ -194,7 +195,7 @@ function processTrimGalore(){
   else
     # move
     #rm -rf "${TRIMGALOR_WORKSPACE_PATH}."echoDateTime
-    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}."echoDateTime
+    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}.bkp."`echoDateTime`
     mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
   fi
 
@@ -209,7 +210,6 @@ function processFastQC(){
     fastqcInputFiles="${fastqcInputFiles} ${inputFile}"
   done
 
-  FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/fastqc-results"
   if [ ! -d ${FASTQC_WORKSPACE_PATH} ] ; then
     mkdir -p ${FASTQC_WORKSPACE_PATH}
   fi
@@ -219,13 +219,16 @@ function processFastQC(){
 
 function getTrimgalorsResultsAsArray(){
   local -n inputFiles_=$1
-  for inputFile in "${ inputFiles_[@]}"
+
+  for inputFile in "${inputFiles_[@]}"
   do
     filename=$(basename $inputFile)
     filenameNoExt="${filename%.*}"
-    if [ $filenameNoExt == *"trimmed"* ] ; then
-      resultArray+=("$inputFile")
-    fi
+    filenameNoExt="${filenameNoExt%.*}"
+    mayBeTrimmedFile=`ls ${TRIMGALOR_WORKSPACE_PATH} | grep ${filenameNoExt} | grep "trimmed"`
+    trimmedFilePath=${TRIMGALOR_WORKSPACE_PATH}/${mayBeTrimmedFile}
+    echo "trimmedFilePath: ${trimmedFilePath}"
+    resultArray+=("${trimmedFilePath}")
   done
 }
 
@@ -251,12 +254,15 @@ function processSeqtk(){
     expr="scale = 4; ${readsCount} * ${usePercentsOfFile_}/100"
     seqCount=$(bc -l <<< $expr)
 
-    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
-    if [ -f ${SEQTK_OUTPUT_FILE_PATH} ]; then
-      # TODO add flag that will remove old if exists
-      echo "File ${SEQTK_OUTPUT_FILE_PATH} already exists - removing"
-      rm -rf ${SEQTK_OUTPUT_FILE_PATH}
+    if [ -d ${SEQTK_WORKSPACE_PATH} ]; then
+      # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
+      echo "File ${SEQTK_WORKSPACE_PATH} already exists - backing up"
+      mv ${SEQTK_WORKSPACE_PATH} "${SEQTK_WORKSPACE_PATH}.bkp."`echoDateTime`
+      mkdir -p ${SEQTK_WORKSPACE_PATH}
     fi
+
+    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
+
     echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
     ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
 
@@ -276,14 +282,14 @@ function run()
 
 
   # TODO fix
-  processTrimGalore inputFiles
+  #processTrimGalore inputFiles
   # TODO FASTQC
   #processFastQC
 
   # get reuslt files to push them into pipeline - TODO test
   getTrimgalorsResultsAsArray inputFiles
-
-  trimmedInputFiles=("${resultArray[@]}")                  #copy the array in another one
+  #copy the array in another one
+  trimmedInputFiles=("${resultArray[@]}")
 
   processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
 
