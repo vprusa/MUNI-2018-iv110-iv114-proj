@@ -237,7 +237,12 @@ function processSeqtk(){
   local -n globalReadsCount_=$2
   local -n usePercentsOfFile_=$3
 
-  if [ ! -d ${SEQTK_WORKSPACE_PATH} ] ; then
+  if [ -d ${SEQTK_WORKSPACE_PATH} ]; then
+    # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
+    echo "File ${SEQTK_WORKSPACE_PATH} already exists - backing up"
+    mv ${SEQTK_WORKSPACE_PATH} "${SEQTK_WORKSPACE_PATH}.bkp."`echoDateTime`
+    mkdir -p ${SEQTK_WORKSPACE_PATH}
+  else
     mkdir -p ${SEQTK_WORKSPACE_PATH}
   fi
 
@@ -254,12 +259,7 @@ function processSeqtk(){
     expr="scale = 4; ${readsCount} * ${usePercentsOfFile_}/100"
     seqCount=$(bc -l <<< $expr)
 
-    if [ -d ${SEQTK_WORKSPACE_PATH} ]; then
-      # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
-      echo "File ${SEQTK_WORKSPACE_PATH} already exists - backing up"
-      mv ${SEQTK_WORKSPACE_PATH} "${SEQTK_WORKSPACE_PATH}.bkp."`echoDateTime`
-      mkdir -p ${SEQTK_WORKSPACE_PATH}
-    fi
+
 
     SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
 
