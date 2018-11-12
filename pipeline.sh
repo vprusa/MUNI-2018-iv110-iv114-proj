@@ -80,13 +80,6 @@ function parse_args
 
 }
 
-# this function handles tirmgalore input and output
-function processTrimGalore(){
-  # TODO move parameters to properties file
-  trim_galore --paired -q 25 --three_prime_clip_R1 15 --three_prime_clip_R2 15 *.clock_UMI.R1.fq.gz *.clock_UMI.R2.fq.gz
-  trim_galore --paired -q 25 --three_prime_clip_R1 15 --three_prime_clip_R2 15 *.clock_UMI.R1.fq.gz *.clock_UMI.R2.fq.gz
-}
-
 # reads cached value by its name \$2 from file \$1 stored in cache dir in workspace
 function getCachedValue(){
   cacheFileName=$1
@@ -130,7 +123,7 @@ function getReadsCount(){
   case "$ext" in
     fastq.gz|fq.gz)
       #echo "$filename : "
-      # for 4GB compressed file it took few minutes
+      # for 4GB compressed file it took few minutes -> caching
       zcat $filepath | echo $((`wc -l`/4))
       ;;
     *)
@@ -141,6 +134,7 @@ function getReadsCount(){
   setCachedValue ${filename} ${cachedKey} ${cachedValue}
 }
 
+# prints parameters and atirbutes at start of script executions
 function echoParameters(){
   echo "WORKSPACE_PATH = ${WORKSPACE_PATH}"
 
@@ -154,6 +148,10 @@ function echoParameters(){
   done
 }
 
+# as name says this method loads workspace
+# loads:
+# properties from properties file
+# prepare directory structure - for workspace and cache
 function loadWorkspace(){
   source $propertiesFile
   echo "WORKSPACE_PATH: $WORKSPACE_PATH"
@@ -167,11 +165,97 @@ function loadWorkspace(){
   fi
 }
 
+
+# this function handles tirmgalore input and output
+function processTrimGalore(){
+  # TODO move parameters to properties file
+  # ./trim_galore --paired ../data/SRR6000947_1.fastq.gz ../data/SRR6000947_2.fastq.gz
+  trimgalorInputFiles=""
+  for inputFile in "${inputFiles[@]}"
+  do
+    trimgalorInputFiles="${trimgalorInputFiles} ${inputFile}"
+  done
+
+  TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
+  if [ ! -d ${TRIMGALOR_WORKSPACE_PATH} ] ; then
+    mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
+  fi
+  ${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
+}
+
+function processFastQC(){
+  fastqcInputFiles=""
+  for inputFile in "${inputFiles[@]}"
+  do
+    fastqcInputFiles="${fastqcInputFiles} ${inputFile}"
+  done
+
+  FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
+  if [ ! -d ${FASTQC_WORKSPACE_PATH} ] ; then
+    mkdir -p ${FASTQC_WORKSPACE_PATH}
+  fi
+
+  # TODO magic if missing value then pass it as function parameter
+
+}
+
+
+function processSeqtk(){
+  # get input as arrays
+  inputFiles_=("$@")
+  SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
+  if [ ! -d ${SEQTK_WORKSPACE_PATH} ] ; then
+    mkdir -p ${SEQTK_WORKSPACE_PATH}
+  fi
+
+  for inputFile_ in "${inputFiles_[@]}"
+  do
+    filename=$(basename -- "$inputFile_")
+    extension="${filename##*.}"
+    filenameNoExt="${filename%.*}"
+    readsCount=$(getReadsCount ${inputFile_})
+    seqCount=$(( ${readsCount}*${usePercentsOfFile} ))
+
+    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile}.fq
+    if [ -f ${SEQTK_OUTPUT_FILE_PATH} ]; then
+      # TODO add flag that will remove old if exists
+      #rm -rf ${SEQTK_OUTPUT_FILE_PATH}
+      echo "File ${SEQTK_OUTPUT_FILE_PATH} already exists skipping"
+    else
+      ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
+    fi
+    #seqtkInputFiles="${seqtkInputFiles} ${inputFile}"
+
+    #${SEQTK_PATH} sample -s100 SRR6000947_2.fastq.gz 2341316 > SRR6000947_2.fastq-seqtk-0.05.fq
+  done
+
+
+  #${SEQTK_PATH} sample -s100 SRR6000947_1.fastq.gz 2341316 > SRR6000947_1.fastq-seqtk-0.05.fq
+
+  #${SEQTK_PATH} sample -s100 SRR6000947_2.fastq.gz 2341316 > SRR6000947_2.fastq-seqtk-0.05.fq
+
+
+  #those files with better quality
+  # SRR6000947_1_val_1.fq.gz
+  # SRR6000947_2_val_2.fq.gz
+
+  #${SEQTK_PATH} sample -s100 SRR6000947_1_val_1.fq.gz 2341316 > SRR6000947_1_eval_1-seqtk-0.05.fq
+
+  #${SEQTK_PATH} sample -s100 SRR6000947_2_val_2.fq.gz 2341316 > SRR6000947_2_eval_2-seqtk-0.05.fq
+
+}
+
+
 function run()
 {
   parse_args "$@"
   loadWorkspace
   echoParameters
+
+  processTrimGalore
+  # TODO FASTQC
+  # processFastQC
+  processSeqtk
 
 }
 
