@@ -21,7 +21,7 @@ function parse_args
   while getopts "p:u:i:-:" o; do
     case "${o}" in
       u)
-        [ -z ${usePercentsOfFile_} ] || usageAlreadySet "usePercentsOfFile"
+        [ -z ${usePercentsOfFile_+x} ] || usageAlreadySet "usePercentsOfFile"
         usePercentsOfFile=${OPTARG}
         [ $(echo "${usePercentsOfFile_}<=100" | bc -l) -eq 1 ] && [ $(echo "$u>0" | bc -l) -eq 1 ] || usage
         ;;
@@ -35,14 +35,14 @@ function parse_args
         echo "Long OPTIND: ${OPTIND} OPTARG: ${OPTARG}"
         case "${OPTARG}" in
           usePercentsOfFile)
-            [ -z ${usePercentsOfFile_} ] || usageAlreadySet "usePercentsOfFile"
+            [ -z ${usePercentsOfFile_+x} ] || usageAlreadySet "usePercentsOfFile"
             #usePercentsOfFile=${OPTARG}
             usePercentsOfFile_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
             echo "usePercentsOfFile: ${usePercentsOfFile_}"
             [ $(echo "${usePercentsOfFile_}<=100" | bc -l) -eq 1 ] && [ $(echo "${usePercentsOfFile_}>0" | bc -l) -eq 1 ] || usage
             ;;
           propertiesFile)
-            [ -z $propertiesFile_ ] || usageAlreadySet "usePercentsOfFile"
+            [ -z ${propertiesFile_+x} ] || usageAlreadySet "usePercentsOfFile"
             propertiesFile_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
             ;;
           inputFile)
@@ -65,14 +65,14 @@ function parse_args
   usePercentsOfFile=$usePercentsOfFile_
   propertiesFile=$propertiesFile_
 
-  if [ -z "${usePercentsOfFile}" ] || [ -z "${propertiesFile}" ] || [ -z "${inputFiles}" ]; then
-    if [ -z "${usePercentsOfFile}" ] ; then
+  if [ -z ${usePercentsOfFile+x} ] || [ -z ${propertiesFile+x} ] || [ -z ${inputFiles+x} ]; then
+    if [ -z ${usePercentsOfFile+x} ] ; then
       echo "Missing usePercentsOfFile parameter";
     fi
-    if [ -z "${propertiesFile}" ] ; then
+    if [ -z ${propertiesFile+x} ] ; then
       echo "Missing propertiesFile parameter";
     fi
-    if [ -z "${inputFiles}" ] ; then
+    if [ -z ${inputFiles+x} ] ; then
       echo "Missing inputFiles parameter";
     fi
     usage
@@ -107,7 +107,6 @@ function setCachedValue(){
 # https://www.biostars.org/p/9610/
 # take \$1 as filePath
 function getReadsCount(){
-  echo "Filepath $1"
   filepath=$1
   filename=$(basename $filepath)
 
@@ -118,7 +117,8 @@ function getReadsCount(){
     echo "$cachedValue"
     return
   fi
-  exit
+  # TODO remove return
+  return
   ext=${filename##*\.}
   case "$ext" in
     fastq.gz|fq.gz)
@@ -140,9 +140,11 @@ function echoParameters(){
 
   echo "usePercentsOfFile = ${usePercentsOfFile}"
   echo "propertiesFile = ${propertiesFile}"
+  echo "inputFiles:"
   for inputFile in "${inputFiles[@]}"
   do
-     echo "inputFile = ${inputFile}"
+    #echo "inputFile = ${inputFile}"
+     echo -e "\t${inputFile}"
      readsCount=$(getReadsCount ${inputFile})
      echo -e "\treadsCount: $readsCount"
   done
@@ -168,7 +170,7 @@ function loadWorkspace(){
 
 # this function handles tirmgalore input and output
 function processTrimGalore(){
-  # TODO move parameters to properties file
+  # TODO move parameters to function arguments and/or properties file
   # ./trim_galore --paired ../data/SRR6000947_1.fastq.gz ../data/SRR6000947_2.fastq.gz
   trimgalorInputFiles=""
   for inputFile in "${inputFiles[@]}"
@@ -180,7 +182,13 @@ function processTrimGalore(){
   if [ ! -d ${TRIMGALOR_WORKSPACE_PATH} ] ; then
     mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
   fi
-  ${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
+  #echo "TRIMGALORE_PATH: ${TRIMGALORE_PATH}"
+  #echo "trimgalorInputFiles: ${trimgalorInputFiles}"
+  #echo "TRIMGALOR_WORKSPACE_PATH: ${TRIMGALOR_WORKSPACE_PATH}"
+
+  # TODO check files existence
+  # TODO uncomment
+  #${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
 }
 
 function processFastQC(){
@@ -196,13 +204,14 @@ function processFastQC(){
   fi
 
   # TODO magic if missing value then pass it as function parameter
-
 }
 
 
 function processSeqtk(){
-  # get input as arrays
-  inputFiles_=("$@")
+  local -n inputFiles_=$1
+  local -n globalReadsCount_=$2
+  local -n usePercentsOfFile_=$3
+
   SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
   if [ ! -d ${SEQTK_WORKSPACE_PATH} ] ; then
     mkdir -p ${SEQTK_WORKSPACE_PATH}
@@ -213,36 +222,23 @@ function processSeqtk(){
     filename=$(basename -- "$inputFile_")
     extension="${filename##*.}"
     filenameNoExt="${filename%.*}"
-    readsCount=$(getReadsCount ${inputFile_})
-    seqCount=$(( ${readsCount}*${usePercentsOfFile} ))
+    if [ ! -z ${globalReadsCount_+x} ] ; then
+      readsCount=$globalReadsCount_
+    else
+      readsCount=$(getReadsCount ${inputFile_})
+    fi
+    expr="scale = 4; ${readsCount} * ${usePercentsOfFile_}/100"
+    seqCount=$(bc -l <<< $expr)
 
-    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile}.fq
+    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
     if [ -f ${SEQTK_OUTPUT_FILE_PATH} ]; then
       # TODO add flag that will remove old if exists
       #rm -rf ${SEQTK_OUTPUT_FILE_PATH}
       echo "File ${SEQTK_OUTPUT_FILE_PATH} already exists skipping"
     else
-      ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
+      echo "Exec skipped: ${SEQTK_PATH}"
     fi
-    #seqtkInputFiles="${seqtkInputFiles} ${inputFile}"
-
-    #${SEQTK_PATH} sample -s100 SRR6000947_2.fastq.gz 2341316 > SRR6000947_2.fastq-seqtk-0.05.fq
   done
-
-
-  #${SEQTK_PATH} sample -s100 SRR6000947_1.fastq.gz 2341316 > SRR6000947_1.fastq-seqtk-0.05.fq
-
-  #${SEQTK_PATH} sample -s100 SRR6000947_2.fastq.gz 2341316 > SRR6000947_2.fastq-seqtk-0.05.fq
-
-
-  #those files with better quality
-  # SRR6000947_1_val_1.fq.gz
-  # SRR6000947_2_val_2.fq.gz
-
-  #${SEQTK_PATH} sample -s100 SRR6000947_1_val_1.fq.gz 2341316 > SRR6000947_1_eval_1-seqtk-0.05.fq
-
-  #${SEQTK_PATH} sample -s100 SRR6000947_2_val_2.fq.gz 2341316 > SRR6000947_2_eval_2-seqtk-0.05.fq
-
 }
 
 
@@ -252,11 +248,18 @@ function run()
   loadWorkspace
   echoParameters
 
-  processTrimGalore
-  # TODO FASTQC
-  # processFastQC
-  processSeqtk
+  # TODO better way how to say that there is just one readCount?
+  globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
+  # TODO fix
+  #processTrimGalore
+  # TODO FASTQC
+  #processFastQC
+
+  processSeqtk inputFiles globalReadsCount usePercentsOfFile
+
+  # TODO ? process evaluated files with fastqc?
+  #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
 }
 
 run "$@";
