@@ -172,8 +172,10 @@ function loadWorkspace(){
 function processTrimGalore(){
   # TODO move parameters to function arguments and/or properties file
   # ./trim_galore --paired ../data/SRR6000947_1.fastq.gz ../data/SRR6000947_2.fastq.gz
+  local -n inputFiles_=$1
+
   trimgalorInputFiles=""
-  for inputFile in "${inputFiles[@]}"
+  for inputFile in "${inputFiles_[@]}"
   do
     trimgalorInputFiles="${trimgalorInputFiles} ${inputFile}"
   done
@@ -181,14 +183,15 @@ function processTrimGalore(){
   TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
   if [ ! -d ${TRIMGALOR_WORKSPACE_PATH} ] ; then
     mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
+  else
+    # move
+    rm -rf "${TRIMGALOR_WORKSPACE_PATH}.old"
+    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}.old"
+    mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
   fi
-  #echo "TRIMGALORE_PATH: ${TRIMGALORE_PATH}"
-  #echo "trimgalorInputFiles: ${trimgalorInputFiles}"
-  #echo "TRIMGALOR_WORKSPACE_PATH: ${TRIMGALOR_WORKSPACE_PATH}"
 
   # TODO check files existence
-  # TODO uncomment
-  #${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
+  ${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
 }
 
 function processFastQC(){
@@ -233,11 +236,13 @@ function processSeqtk(){
     SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
     if [ -f ${SEQTK_OUTPUT_FILE_PATH} ]; then
       # TODO add flag that will remove old if exists
-      #rm -rf ${SEQTK_OUTPUT_FILE_PATH}
-      echo "File ${SEQTK_OUTPUT_FILE_PATH} already exists skipping"
-    else
-      echo "Exec skipped: ${SEQTK_PATH}"
+      echo "File ${SEQTK_OUTPUT_FILE_PATH} already exists - removing"
+      rm -rf ${SEQTK_OUTPUT_FILE_PATH}
     fi
+    echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
+    ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
+
+
   done
 }
 
@@ -252,7 +257,7 @@ function run()
   globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
   # TODO fix
-  #processTrimGalore
+  processTrimGalore inputFiles
   # TODO FASTQC
   #processFastQC
 
