@@ -87,32 +87,91 @@ function processTrimGalore(){
   trim_galore --paired -q 25 --three_prime_clip_R1 15 --three_prime_clip_R2 15 *.clock_UMI.R1.fq.gz *.clock_UMI.R2.fq.gz
 }
 
-# https://www.biostars.org/p/9610/
-# take \$1 as filePath
-function getFileCount(){
-  echo "Filepath $1"
-  filename=$(basename $1)
-  ext=${filename##*\.}
-  case "$ext" in
-    fastqgz) echo "$filename : "
-      ;;
-    fqgz) echo "$filename : "
-      ;;
-    *) echo " $filename : "
-      ;;
-  esac
+# reads cached value by its name \$2 from file \$1 stored in cache dir in workspace
+function getCachedValue(){
+  cacheFileName=$1
+  propertyKey=$2
+  cachedFilePath=${CACHE_DIR_PATH}/${cacheFileName}.cached.properties
+  if [ ! -f "$cachedFilePath" ]; then
+    return
+  fi
+  propValue=`cat $cachedFilePath | grep "$propertyKey" `
+  echo "${propValue/${propertyKey}=/}"
 }
 
-function run()
-{
-  parse_args "$@"
+# reads cached value by its name \$2 from file \$1 stored in cache dir in workspace
+function setCachedValue(){
+  cacheFileName=$1
+  propertyKey=$2
+  propertyValue=$3
+  cachedFilePath=${CACHE_DIR_PATH}/${cacheFileName}.cached.properties
+  if [ ! -f "$cachedFilePath" ]; then
+    touch $cachedFilePath
+  fi
+  echo "${propertyKey}=${propertyValue}" >>  ${cachedFilePath}
+}
+
+# https://www.biostars.org/p/9610/
+# take \$1 as filePath
+function getReadsCount(){
+  echo "Filepath $1"
+  filepath=$1
+  filename=$(basename $filepath)
+
+  cachedKey="READS_COUNT"
+  cachedValue=`getCachedValue $filename "$cachedKey"`
+
+  if [ ! -z $cachedValue ]; then
+    echo "$cachedValue"
+    return
+  fi
+  exit
+  ext=${filename##*\.}
+  case "$ext" in
+    fastq.gz|fq.gz)
+      #echo "$filename : "
+      # for 4GB compressed file it took few minutes
+      zcat $filepath | echo $((`wc -l`/4))
+      ;;
+    *)
+      # do nothing
+      #echo " $filename : "
+      ;;
+  esac
+  setCachedValue ${filename} ${cachedKey} ${cachedValue}
+}
+
+function echoParameters(){
+  echo "WORKSPACE_PATH = ${WORKSPACE_PATH}"
 
   echo "usePercentsOfFile = ${usePercentsOfFile}"
   echo "propertiesFile = ${propertiesFile}"
   for inputFile in "${inputFiles[@]}"
   do
      echo "inputFile = ${inputFile}"
+     readsCount=$(getReadsCount ${inputFile})
+     echo -e "\treadsCount: $readsCount"
   done
+}
+
+function loadWorkspace(){
+  source $propertiesFile
+  echo "WORKSPACE_PATH: $WORKSPACE_PATH"
+  if [ ! -d "$WORKSPACE_PATH" ]; then
+    mkdir -p $WORKSPACE_PATH
+  fi
+  echo "CACHE_DIR_PATH: $CACHE_DIR_PATH"
+  CACHE_DIR_PATH="${WORKSPACE_PATH}/cache"
+  if [ ! -d "$CACHE_DIR_PATH" ]; then
+    mkdir $CACHE_DIR_PATH
+  fi
+}
+
+function run()
+{
+  parse_args "$@"
+  loadWorkspace
+  echoParameters
 
 }
 
