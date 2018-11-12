@@ -246,7 +246,7 @@ function processSeqtk(){
   done
 }
 
-
+# this is the main method that runs everything
 function run()
 {
   parse_args "$@"
@@ -267,4 +267,5 @@ function run()
   #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
 }
 
+# lets run it with program arguments
 run "$@";
