@@ -5,6 +5,9 @@ THIS_DIR_PATH=$(dirname `realpath "$0"`)
 #abort on error
 set -e
 
+# global result array, can not use recursion for this
+declare -a resultArray
+
 function usage() {
   echo "Usage: $0 [[--usePercentsOfFile|-u] (0,100>]] [[--properties|-p] <propertiesFile.properties>] {[[--inputFile|-i] <filepath.[fastq.gz|fq.gz|fq|fastq]>] ...} " 1>&2; exit 1;
 }
@@ -160,6 +163,9 @@ function loadWorkspace(){
   if [ ! -d "$WORKSPACE_PATH" ]; then
     mkdir -p $WORKSPACE_PATH
   fi
+  TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
+  SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
+
   echo "CACHE_DIR_PATH: $CACHE_DIR_PATH"
   CACHE_DIR_PATH="${WORKSPACE_PATH}/cache"
   if [ ! -d "$CACHE_DIR_PATH" ]; then
@@ -167,6 +173,9 @@ function loadWorkspace(){
   fi
 }
 
+function echoDateTime(){
+  echo `date +%Y-%m-%d_%H-%M-%S`
+}
 
 # this function handles tirmgalore input and output
 function processTrimGalore(){
@@ -180,13 +189,12 @@ function processTrimGalore(){
     trimgalorInputFiles="${trimgalorInputFiles} ${inputFile}"
   done
 
-  TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
   if [ ! -d ${TRIMGALOR_WORKSPACE_PATH} ] ; then
     mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
   else
     # move
-    rm -rf "${TRIMGALOR_WORKSPACE_PATH}.old"
-    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}.old"
+    #rm -rf "${TRIMGALOR_WORKSPACE_PATH}."echoDateTime
+    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}."echoDateTime
     mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
   fi
 
@@ -201,7 +209,7 @@ function processFastQC(){
     fastqcInputFiles="${fastqcInputFiles} ${inputFile}"
   done
 
-  FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
+  FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/fastqc-results"
   if [ ! -d ${FASTQC_WORKSPACE_PATH} ] ; then
     mkdir -p ${FASTQC_WORKSPACE_PATH}
   fi
@@ -209,13 +217,23 @@ function processFastQC(){
   # TODO magic if missing value then pass it as function parameter
 }
 
+function getTrimgalorsResultsAsArray(){
+  local -n inputFiles_=$1
+  for inputFile in "${ inputFiles_[@]}"
+  do
+    filename=$(basename $inputFile)
+    filenameNoExt="${filename%.*}"
+    if [ $filenameNoExt == *"trimmed"* ] ; then
+      resultArray+=("$inputFile")
+    fi
+  done
+}
 
 function processSeqtk(){
   local -n inputFiles_=$1
   local -n globalReadsCount_=$2
   local -n usePercentsOfFile_=$3
 
-  SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
   if [ ! -d ${SEQTK_WORKSPACE_PATH} ] ; then
     mkdir -p ${SEQTK_WORKSPACE_PATH}
   fi
@@ -256,12 +274,18 @@ function run()
   # TODO better way how to say that there is just one readCount?
   globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
+
   # TODO fix
   processTrimGalore inputFiles
   # TODO FASTQC
   #processFastQC
 
-  processSeqtk inputFiles globalReadsCount usePercentsOfFile
+  # get reuslt files to push them into pipeline - TODO test
+  getTrimgalorsResultsAsArray inputFiles
+
+  trimmedInputFiles=("${resultArray[@]}")                  #copy the array in another one
+
+  processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
 
   # TODO ? process evaluated files with fastqc?
   #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
