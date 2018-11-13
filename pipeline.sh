@@ -9,7 +9,7 @@ set -e
 declare -a resultArray
 
 function usage() {
-  echo "Usage: $0 [[--usePercentsOfFile|-u] (0,100>]] [[--properties|-p] <propertiesFile.properties>] {[[--inputFile|-i] <filepath.[fastq.gz|fq.gz|fq|fastq]>] ...} " 1>&2; exit 1;
+  echo "Usage: $0 [{<-d|--do> <trimgalor|seqtk|fastqc> ...}] [<-u|--usePercentsOfFile> (0,100>]] [<--properties|-p> <propertiesFile.properties>] {[<--inputFile|-i> <filepath.<fastq.gz|fq.gz|fq|fastq>>] ...} " 1>&2; exit 1;
 }
 
 function usageAlreadySet() {
@@ -21,7 +21,7 @@ function usageAlreadySet() {
 function parse_args
 {
 
-  while getopts "p:u:i:-:" o; do
+  while getopts "p:u:i:d:-:" o; do
     case "${o}" in
       u)
         [ -z ${usePercentsOfFile_+x} ] || usageAlreadySet "usePercentsOfFile"
@@ -33,6 +33,8 @@ function parse_args
         ;;
       i)
         inputFiles+=("$OPTARG")
+      d)
+        doProcess+=("$OPTARG")
         ;;
       -)
         echo "Long OPTIND: ${OPTIND} OPTARG: ${OPTARG}"
@@ -51,6 +53,10 @@ function parse_args
           inputFile)
             inputFile_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
             inputFiles+=("$inputFile_")
+            ;;
+          do)
+            doProcess_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
+            doProcess+=("$doProcess_")
             ;;
           *)
             if [ "$OPTERR" = 1 ] && [ "${optspec:0:1}" != ":" ]; then
@@ -266,7 +272,6 @@ function processSeqtk(){
     echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
     ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
 
-
   done
 }
 
@@ -277,22 +282,27 @@ function run()
   loadWorkspace
   echoParameters
 
-  # TODO better way how to say that there is just one readCount?
-  globalReadsCount=$(getReadsCount ${inputFiles[0]})
+  if [[ -z $doProcess || -n "${doProcess['trimgaloer']}" ]] ; then
+    # TODO better way how to say that there is just one readCount?
+    globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
+    # TODO fix
+    #processTrimGalore inputFiles
+  fi
 
-  # TODO fix
-  #processTrimGalore inputFiles
-  # TODO FASTQC
-  #processFastQC
+  if [[ -z $doProcess || -n "${doProcess['fastqc']}" ]] ; then
+    # TODO FASTQC
+    #processFastQC
+  fi
+
 
   # get reuslt files to push them into pipeline - TODO test
   getTrimgalorsResultsAsArray inputFiles
   #copy the array in another one
   trimmedInputFiles=("${resultArray[@]}")
-
-  processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
-
+  if [[ -z $doProcess || -n "${doProcess['seqtk']}" ]] ; then
+    processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
+  fi
   # TODO ? process evaluated files with fastqc?
   #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
 }
