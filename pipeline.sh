@@ -282,7 +282,7 @@ function run()
   loadWorkspace
   echoParameters
 
-  if [[ -z $doProcess || -n "${doProcess['trimgaloer']}" ]] ; then
+  if [[ -z $doProcess || -n "${doProcess['trimgalore']}" ]] ; then
     # TODO better way how to say that there is just one readCount?
     globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
