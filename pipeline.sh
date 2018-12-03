@@ -307,9 +307,12 @@ function processDiamond(){
     filename="${filenameWithExt%.*}"
 
     # convert fq to fa
-    if [ ! -f "${inputFile_%.*}.fq" ] ; then
+    if [ ! -f "${inputFile_%.*}.fa" ] ; then
       echo "Converting ${inputFile_%.*}.fq to ${inputFile_%.*}.fa"
-      sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${inputFile_}.fa
+      sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa
+      #${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa
+      inputFile_="${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa"
+      resultArray+=("${inputFile_}")
     fi
 
     if [[ ! ${inputFile_%.*} == *.fa ]] ; then
@@ -317,9 +320,9 @@ function processDiamond(){
       resultArray+=("${inputFile_}")
     fi
 
-    echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}diamond-${filename}${PARAMTERES_EXT}.log"
-    #FILE_NAME=SRR6000947_2_eval_2-seqtk-0.05.fa
-    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}diamond-${filename}${PARAMTERES_EXT}.log
+    echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log"
+
+    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
   done
 }
 
