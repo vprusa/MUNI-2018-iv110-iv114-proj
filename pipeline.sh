@@ -316,11 +316,6 @@ function processDiamond(){
       resultArray+=("${inputFile_}")
     fi
 
-    if [[ ! ${inputFile_%.*} == *.fa ]] ; then
-      inputFile_="${inputFile_%.*}.fa"
-      resultArray+=("${inputFile_}")
-    fi
-
     echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log"
 
     ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
@@ -386,6 +381,8 @@ function run()
 
   if containsElement ${doProcess} "diamond"; then
     processDiamond inputFiles
+    # update input files to use .fa?
+    #inputFiles = ("${resultArray[@]}")
   fi
 
   if containsElement ${doProcess} "megan6" ; then
