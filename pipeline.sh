@@ -345,7 +345,7 @@ function run()
   loadWorkspace
   echoParameters
   if [[ -z ${doProcess} ]] ; then
-    doProcess=""
+    doProcess=( trimgalore seqtk velvet metaVelvet diamond megan6 )
   fi
 
   if containsElement ${doProcess} "trimgalore"; then
@@ -370,6 +370,7 @@ function run()
   if containsElement "seqtk" ${doProcess}; then
     processSeqtk trimmedInputFiles globalReadsCount
   fi
+
   if containsElement ${doProcess} "velvet" ; then
     processVelvet inputFiles
   fi
