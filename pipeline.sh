@@ -169,9 +169,13 @@ function loadWorkspace(){
   if [ ! -d "$WORKSPACE_PATH" ]; then
     mkdir -p $WORKSPACE_PATH
   fi
-  TRIMGALOR_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
+  TRIMGALORE_WORKSPACE_PATH="${WORKSPACE_PATH}/trimgalore-results"
   SEQTK_WORKSPACE_PATH="${WORKSPACE_PATH}/seqtk-results"
   FASTQC_WORKSPACE_PATH="${WORKSPACE_PATH}/fastqc-results"
+  DIAMOND_WORKSPACE_PATH="${WORKSPACE_PATH}/diamond-results"
+  VELVET_WORKSPACE_PATH="${WORKSPACE_PATH}/velvet-results"
+  METAVELVET_WORKSPACE_PATH="${WORKSPACE_PATH}/metavelvet-results"
+  MEGAN6_WORKSPACE_PATH="${WORKSPACE_PATH}/megan6-results"
 
   echo "CACHE_DIR_PATH: $CACHE_DIR_PATH"
   CACHE_DIR_PATH="${WORKSPACE_PATH}/cache"
@@ -184,29 +188,36 @@ function echoDateTime(){
   echo `date +%Y-%m-%d_%H-%M-%S`
 }
 
+function backupWorkspace(){
+  local -n workspacePath=$1
+
+  if [ -d ${workspacePath} ]; then
+    # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
+    echo "File ${workspacePath} already exists - backing up"
+    mv ${workspacePath} "${workspacePath}.bkp."`echoDateTime`
+    mkdir -p ${workspacePath}
+  else
+    mkdir -p ${workspacePath}
+  fi
+
+}
+
 # this function handles tirmgalore input and output
 function processTrimGalore(){
   # TODO move parameters to function arguments and/or properties file
   # ./trim_galore --paired ../data/SRR6000947_1.fastq.gz ../data/SRR6000947_2.fastq.gz
   local -n inputFiles_=$1
 
-  trimgalorInputFiles=""
+  trimgaloreInputFiles=""
   for inputFile in "${inputFiles_[@]}"
   do
-    trimgalorInputFiles="${trimgalorInputFiles} ${inputFile}"
+    trimgaloreInputFiles="${trimgaloreInputFiles} ${inputFile}"
   done
 
-  if [ ! -d ${TRIMGALOR_WORKSPACE_PATH} ] ; then
-    mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
-  else
-    # move
-    #rm -rf "${TRIMGALOR_WORKSPACE_PATH}."echoDateTime
-    mv "${TRIMGALOR_WORKSPACE_PATH}" "${TRIMGALOR_WORKSPACE_PATH}.bkp."`echoDateTime`
-    mkdir -p ${TRIMGALOR_WORKSPACE_PATH}
-  fi
+  backupWorkspace ${TRIMGALORE_WORKSPACE_PATH}
 
   # TODO check files existence
-  ${TRIMGALORE_PATH} --paired -q 25 ${trimgalorInputFiles} -o ${TRIMGALOR_WORKSPACE_PATH}
+  ${TRIMGALORE_PATH} --paired -q ${TRIMGALORE_PARAM_Q} ${trimgaloreInputFiles} -o ${TRIMGALORE_WORKSPACE_PATH}
 }
 
 function processFastQC(){
@@ -231,8 +242,8 @@ function getTrimgalorsResultsAsArray(){
     filename=$(basename $inputFile)
     filenameNoExt="${filename%.*}"
     filenameNoExt="${filenameNoExt%.*}"
-    mayBeTrimmedFile=`ls ${TRIMGALOR_WORKSPACE_PATH} | grep ${filenameNoExt} | grep "trimmed"`
-    trimmedFilePath=${TRIMGALOR_WORKSPACE_PATH}/${mayBeTrimmedFile}
+    mayBeTrimmedFile=`ls ${TRIMGALORE_WORKSPACE_PATH} | grep ${filenameNoExt} | grep "trimmed"`
+    trimmedFilePath=${TRIMGALORE_WORKSPACE_PATH}/${mayBeTrimmedFile}
     echo "trimmedFilePath: ${trimmedFilePath}"
     resultArray+=("${trimmedFilePath}")
   done
@@ -243,14 +254,8 @@ function processSeqtk(){
   local -n globalReadsCount_=$2
   local -n usePercentsOfFile_=$3
 
-  if [ -d ${SEQTK_WORKSPACE_PATH} ]; then
-    # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
-    echo "File ${SEQTK_WORKSPACE_PATH} already exists - backing up"
-    mv ${SEQTK_WORKSPACE_PATH} "${SEQTK_WORKSPACE_PATH}.bkp."`echoDateTime`
-    mkdir -p ${SEQTK_WORKSPACE_PATH}
-  else
-    mkdir -p ${SEQTK_WORKSPACE_PATH}
-  fi
+
+  backupWorkspace ${SEQTK_WORKSPACE_PATH}
 
   for inputFile_ in "${inputFiles_[@]}"
   do
@@ -275,6 +280,45 @@ function processSeqtk(){
   done
 }
 
+function processVelvet(){
+  local -n inputFiles_=$1
+
+  backupWorkspace ${VELVET_WORKSPACE_PATH}
+
+  inputFilesString=$( IFS=$'\n'; echo "${inputFiles_[*]}" )
+  # velveth_de
+  #${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} 31 -fastq -shortPaired ${inputFilesString}
+  #${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} -exp_cov auto
+  ${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}
+  ${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETG_PARAMS}
+  # was -exp_cov 19 byt metavelvet needs -exp_cov auto
+}
+
+function processMetaVelvet(){
+
+}
+
+
+function processDiamond(){
+  local -n inputFiles_=$1
+  #PARAMTERES_EXT=.f6b${DIAMOND_PARAM_B}p${DIAMOND_PARAM_PROCESSES}
+
+  backupWorkspace ${DIAMOND_WORKSPACE_PATH}
+
+  for inputFile_ in "${inputFiles_[@]}"
+  do
+    PARAMTERES_EXT=""
+    FILE_NAME=$(basename -- "$fullfile")
+    filename="${FILE_NAME%.*}"
+    #FILE_NAME=SRR6000947_2_eval_2-seqtk-0.05.fa
+    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE}diamond-${FILE_NAME}${PARAMTERES_EXT}.log
+  done
+}
+
+function processMegan6(){
+
+}
+
 # this is the main method that runs everything
 function run()
 {
@@ -287,7 +331,7 @@ function run()
     globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
     # TODO fix
-    #processTrimGalore inputFiles
+    processTrimGalore inputFiles
   fi
 
   if [[ -z $doProcess || -n "${doProcess['fastqc']}" ]] ; then
@@ -295,14 +339,32 @@ function run()
     #processFastQC
   fi
 
-
   # get reuslt files to push them into pipeline - TODO test
   getTrimgalorsResultsAsArray inputFiles
+
   #copy the array in another one
   trimmedInputFiles=("${resultArray[@]}")
   if [[ -z $doProcess || -n "${doProcess['seqtk']}" ]] ; then
     processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
   fi
+
+  if [[ -z $doProcess || -n "${doProcess['velvet']}" ]] ; then
+    processVelvet inputFiles
+  fi
+
+  # pairs
+  if [[ -z $doProcess || -n "${doProcess['metaVelvet']}" ]] ; then
+    processMetaVelvet
+  fi
+
+  if [[ -z $doProcess || -n "${doProcess['diamond']}" ]] ; then
+    processDiamond
+  fi
+
+  if [[ -z $doProcess || -n "${doProcess['megan6']}" ]] ; then
+    processMegan6
+  fi
+
   # TODO ? process evaluated files with fastqc?
   #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
 }
