@@ -9,7 +9,7 @@ set -e
 declare -a resultArray
 
 function usage() {
-  echo "Usage: $0 [{<-d|--do> <trimgalor|seqtk|fastqc> ...}] [<-u|--usePercentsOfFile> (0,100>]] [<--properties|-p> <propertiesFile.properties>] {[<--inputFile|-i> <filepath.<fastq.gz|fq.gz|fq|fastq>>] ...} " 1>&2; exit 1;
+  echo "Usage: $0 [{<-d|--do> <trimgalor|seqtk|fastqc|diamond|velvet|metavelvet|megan6> ...}] [<--properties|-p> <propertiesFile.properties>] {[<--inputFile|-i> <filepath.<fastq.gz|fq.gz|fq|fastq>>] ...} " 1>&2; exit 1;
 }
 
 function usageAlreadySet() {
@@ -20,34 +20,22 @@ function usageAlreadySet() {
 
 function parse_args
 {
-
   while getopts "p:u:i:d:-:" o; do
     case "${o}" in
-      u)
-        [ -z ${usePercentsOfFile_+x} ] || usageAlreadySet "usePercentsOfFile"
-        usePercentsOfFile=${OPTARG}
-        [ $(echo "${usePercentsOfFile_}<=100" | bc -l) -eq 1 ] && [ $(echo "$u>0" | bc -l) -eq 1 ] || usage
-        ;;
       p)
-        properties=${OPTARG}
+        propertiesFile_=${OPTARG}
         ;;
       i)
         inputFiles+=("$OPTARG")
+        ;;
       d)
         doProcess+=("$OPTARG")
         ;;
       -)
         echo "Long OPTIND: ${OPTIND} OPTARG: ${OPTARG}"
         case "${OPTARG}" in
-          usePercentsOfFile)
-            [ -z ${usePercentsOfFile_+x} ] || usageAlreadySet "usePercentsOfFile"
-            #usePercentsOfFile=${OPTARG}
-            usePercentsOfFile_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
-            echo "usePercentsOfFile: ${usePercentsOfFile_}"
-            [ $(echo "${usePercentsOfFile_}<=100" | bc -l) -eq 1 ] && [ $(echo "${usePercentsOfFile_}>0" | bc -l) -eq 1 ] || usage
-            ;;
           propertiesFile)
-            [ -z ${propertiesFile_+x} ] || usageAlreadySet "usePercentsOfFile"
+            [ -z ${propertiesFile_+x} ] || usageAlreadySet "-p"
             propertiesFile_="${!OPTIND}"; OPTIND=$(( $OPTIND + 1 ))
             ;;
           inputFile)
@@ -71,13 +59,9 @@ function parse_args
   done
   shift $((OPTIND-1));
 
-  usePercentsOfFile=$usePercentsOfFile_
   propertiesFile=$propertiesFile_
 
-  if [ -z ${usePercentsOfFile+x} ] || [ -z ${propertiesFile+x} ] || [ -z ${inputFiles+x} ]; then
-    if [ -z ${usePercentsOfFile+x} ] ; then
-      echo "Missing usePercentsOfFile parameter";
-    fi
+  if [ -z ${propertiesFile+x} ] || [ -z ${inputFiles+x} ]; then
     if [ -z ${propertiesFile+x} ] ; then
       echo "Missing propertiesFile parameter";
     fi
@@ -147,7 +131,6 @@ function getReadsCount(){
 function echoParameters(){
   echo "WORKSPACE_PATH = ${WORKSPACE_PATH}"
 
-  echo "usePercentsOfFile = ${usePercentsOfFile}"
   echo "propertiesFile = ${propertiesFile}"
   echo "inputFiles:"
   for inputFile in "${inputFiles[@]}"
@@ -189,7 +172,7 @@ function echoDateTime(){
 }
 
 function backupWorkspace(){
-  local -n workspacePath=$1
+  local workspacePath=$1
 
   if [ -d ${workspacePath} ]; then
     # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
@@ -252,8 +235,6 @@ function getTrimgalorsResultsAsArray(){
 function processSeqtk(){
   local -n inputFiles_=$1
   local -n globalReadsCount_=$2
-  local -n usePercentsOfFile_=$3
-
 
   backupWorkspace ${SEQTK_WORKSPACE_PATH}
 
@@ -267,12 +248,12 @@ function processSeqtk(){
     else
       readsCount=$(getReadsCount ${inputFile_})
     fi
-    expr="scale = 4; ${readsCount} * ${usePercentsOfFile_}/100"
+    expr="scale = 4; ${readsCount} * ${SEQTK_PARAM_PERCENTS}/100"
     seqCount=$(bc -l <<< $expr)
 
 
 
-    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${usePercentsOfFile_}.fq
+    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${SEQTK_PARAM_PERCENTS}.fq
 
     echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
     ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
@@ -295,9 +276,8 @@ function processVelvet(){
 }
 
 function processMetaVelvet(){
-
+  echo "MetaVelvet"
 }
-
 
 function processDiamond(){
   local -n inputFiles_=$1
@@ -310,13 +290,18 @@ function processDiamond(){
     PARAMTERES_EXT=""
     FILE_NAME=$(basename -- "$fullfile")
     filename="${FILE_NAME%.*}"
+
+    # convert fq to fa
+    sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${inputFile_}.fa
+    inputFile_="${inputFile_%.*}.fa"
+
     #FILE_NAME=SRR6000947_2_eval_2-seqtk-0.05.fa
     ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE}diamond-${FILE_NAME}${PARAMTERES_EXT}.log
   done
 }
 
 function processMegan6(){
-
+  echo "Megan6"
 }
 
 # this is the main method that runs everything
@@ -337,6 +322,7 @@ function run()
   if [[ -z $doProcess || -n "${doProcess['fastqc']}" ]] ; then
     # TODO FASTQC
     #processFastQC
+    echo "Not processing FastQC"
   fi
 
   # get reuslt files to push them into pipeline - TODO test
@@ -345,7 +331,7 @@ function run()
   #copy the array in another one
   trimmedInputFiles=("${resultArray[@]}")
   if [[ -z $doProcess || -n "${doProcess['seqtk']}" ]] ; then
-    processSeqtk trimmedInputFiles globalReadsCount usePercentsOfFile
+    processSeqtk trimmedInputFiles globalReadsCount
   fi
 
   if [[ -z $doProcess || -n "${doProcess['velvet']}" ]] ; then
@@ -366,7 +352,7 @@ function run()
   fi
 
   # TODO ? process evaluated files with fastqc?
-  #processSeqtk inputFilesWithBetterQualityArray globalReadsCount usePercentsOfFile
+  #processSeqtk inputFilesWithBetterQualityArray globalReadsCount
 }
 
 # lets run it with program arguments
