@@ -140,6 +140,13 @@ function echoParameters(){
      readsCount=$(getReadsCount ${inputFile})
      echo -e "\treadsCount: $readsCount"
   done
+
+  echo "doProcess:"
+  for process in "${doProcess[@]}"
+  do
+    #echo "inputFile = ${inputFile}"
+     echo -e "\t${process}"
+  done
 }
 
 # as name says this method loads workspace
@@ -222,14 +229,23 @@ function getTrimgalorsResultsAsArray(){
 
   for inputFile in "${inputFiles_[@]}"
   do
+    #echo "inputFile: $inputFile"
     filename=$(basename $inputFile)
     filenameNoExt="${filename%.*}"
     filenameNoExt="${filenameNoExt%.*}"
-    mayBeTrimmedFile=`ls ${TRIMGALORE_WORKSPACE_PATH} | grep ${filenameNoExt} | grep "trimmed"`
+    #echo "filenameNoExt: ${filenameNoExt}"
+    if [ -z `ls ${TRIMGALORE_WORKSPACE_PATH} | grep "trimmed" | grep ${filenameNoExt}` ] ; then
+      #echo "noout"
+      continue
+    fi
+    mayBeTrimmedFile=`ls ${TRIMGALORE_WORKSPACE_PATH}  | grep "trimmed" | grep ${filenameNoExt}`
+    #echo "mayBeTrimmedFile:"
+    #echo "mayBeTrimmedFile: ${mayBeTrimmedFile}"
     trimmedFilePath=${TRIMGALORE_WORKSPACE_PATH}/${mayBeTrimmedFile}
-    echo "trimmedFilePath: ${trimmedFilePath}"
+    #echo "trimmedFilePath: ${trimmedFilePath}"
     resultArray+=("${trimmedFilePath}")
   done
+
 }
 
 function processSeqtk(){
@@ -250,8 +266,6 @@ function processSeqtk(){
     fi
     expr="scale = 4; ${readsCount} * ${SEQTK_PARAM_PERCENTS}/100"
     seqCount=$(bc -l <<< $expr)
-
-
 
     SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${SEQTK_PARAM_PERCENTS}.fq
 
@@ -281,6 +295,7 @@ function processMetaVelvet(){
 
 function processDiamond(){
   local -n inputFiles_=$1
+  echo "processDiamond"
   #PARAMTERES_EXT=.f6b${DIAMOND_PARAM_B}p${DIAMOND_PARAM_PROCESSES}
 
   backupWorkspace ${DIAMOND_WORKSPACE_PATH}
@@ -288,20 +303,40 @@ function processDiamond(){
   for inputFile_ in "${inputFiles_[@]}"
   do
     PARAMTERES_EXT=""
-    FILE_NAME=$(basename -- "$fullfile")
-    filename="${FILE_NAME%.*}"
+    filenameWithExt=$(basename -- "$inputFile_")
+    filename="${filenameWithExt%.*}"
 
     # convert fq to fa
-    sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${inputFile_}.fa
-    inputFile_="${inputFile_%.*}.fa"
+    if [ ! -f "${inputFile_%.*}.fq" ] ; then
+      echo "Converting ${inputFile_%.*}.fq to ${inputFile_%.*}.fa"
+      sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${inputFile_}.fa
+    fi
 
+    if [[ ! ${inputFile_%.*} == *.fa ]] ; then
+      inputFile_="${inputFile_%.*}.fa"
+      resultArray+=("${inputFile_}")
+    fi
+
+    echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}diamond-${filename}${PARAMTERES_EXT}.log"
     #FILE_NAME=SRR6000947_2_eval_2-seqtk-0.05.fa
-    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE}diamond-${FILE_NAME}${PARAMTERES_EXT}.log
+    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}diamond-${filename}${PARAMTERES_EXT}.log
   done
 }
 
 function processMegan6(){
   echo "Megan6"
+}
+
+function containsElement {
+  ARRAY=$2
+  for e in ${ARRAY[*]}
+  do
+    if [[ "$e" == "$1" ]]
+    then
+      return 0
+    fi
+  done
+  return 1
 }
 
 # this is the main method that runs everything
@@ -310,8 +345,11 @@ function run()
   parse_args "$@"
   loadWorkspace
   echoParameters
+  if [[ -z ${doProcess} ]] ; then
+    doProcess=""
+  fi
 
-  if [[ -z $doProcess || -n "${doProcess['trimgalore']}" ]] ; then
+  if containsElement ${doProcess} "trimgalore"; then
     # TODO better way how to say that there is just one readCount?
     globalReadsCount=$(getReadsCount ${inputFiles[0]})
 
@@ -319,7 +357,7 @@ function run()
     processTrimGalore inputFiles
   fi
 
-  if [[ -z $doProcess || -n "${doProcess['fastqc']}" ]] ; then
+  if containsElement ${doProcess} "fastqc"; then
     # TODO FASTQC
     #processFastQC
     echo "Not processing FastQC"
@@ -330,25 +368,24 @@ function run()
 
   #copy the array in another one
   trimmedInputFiles=("${resultArray[@]}")
-  if [[ -z $doProcess || -n "${doProcess['seqtk']}" ]] ; then
+  if containsElement "seqtk" ${doProcess}; then
     processSeqtk trimmedInputFiles globalReadsCount
   fi
-
-  if [[ -z $doProcess || -n "${doProcess['velvet']}" ]] ; then
+  if containsElement ${doProcess} "velvet" ; then
     processVelvet inputFiles
   fi
 
   # pairs
-  if [[ -z $doProcess || -n "${doProcess['metaVelvet']}" ]] ; then
-    processMetaVelvet
+  if containsElement ${doProcess} "metaVelvet" ; then
+    processMetaVelvet inputFiles
   fi
 
-  if [[ -z $doProcess || -n "${doProcess['diamond']}" ]] ; then
-    processDiamond
+  if containsElement ${doProcess} "diamond"; then
+    processDiamond inputFiles
   fi
 
-  if [[ -z $doProcess || -n "${doProcess['megan6']}" ]] ; then
-    processMegan6
+  if containsElement ${doProcess} "megan6" ; then
+    processMegan6 inputFiles
   fi
 
   # TODO ? process evaluated files with fastqc?
