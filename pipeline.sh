@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/bin/bash
 
-THIS_DIR_PATH=$(dirname `realpath "$0"`)
+#THIS_DIR_PATH=$(dirname `realpath "$0"`)
+THIS_DIR_PATH=$(dirname `pwd`)
 
 #abort on error
 set -e
@@ -320,9 +321,9 @@ function processDiamond(){
       resultArray+=("${inputFile_}")
     fi
 
-    echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log"
+    echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log"
 
-    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
+    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
   done
 }
 
