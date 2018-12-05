@@ -16,4 +16,8 @@ This project is example of pipeline using:
 ./pipeline.sh -p ./properties-test-local.properties -i ./data/SRR6000947_1.fastq.gz -i ./data/SRR6000947_2.fastq.gz
 ```
 
+```
+./pipeline.sh -p properties-biolinux.properties -i ./../data/original/SRR6000947_1.fastq.gz -i ./../data/original/SRR6000947_2.fastq.gz &> current.log &
+```
+
 Use ```{[<-d|--do> <trimgalor|seqtk|fastqc>] ...}``` to select just certain steps(SW) and thus avoid unnecessary processes and reuse already generated files (not using SW workspace backup).
