@@ -131,6 +131,7 @@ function getReadsCount(){
 # prints parameters and atirbutes at start of script executions
 function echoParameters(){
   echo "WORKSPACE_PATH = ${WORKSPACE_PATH}"
+  echo "DRY_RUN = ${DRY_RUN}"
 
   echo "propertiesFile = ${propertiesFile}"
   echo "inputFiles:"
@@ -185,12 +186,11 @@ function backupWorkspace(){
   if [ -d ${workspacePath} ]; then
     # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
     echo "File ${workspacePath} already exists - backing up"
-    mv ${workspacePath} "${workspacePath}.bkp."`echoDateTime`
+    mv ${workspacePath} "${workspacePath}.bkp.${DRY_RUN}."`echoDateTime`
     mkdir -p ${workspacePath}
   else
     mkdir -p ${workspacePath}
   fi
-
 }
 
 # this function handles tirmgalore input and output
@@ -206,9 +206,9 @@ function processTrimGalore(){
   done
 
   backupWorkspace ${TRIMGALORE_WORKSPACE_PATH}
-
+  echo "${TRIMGALORE_PATH} --paired -q ${TRIMGALORE_PARAM_Q} ${trimgaloreInputFiles} -o ${TRIMGALORE_WORKSPACE_PATH}"
   # TODO check files existence
-  ${TRIMGALORE_PATH} --paired -q ${TRIMGALORE_PARAM_Q} ${trimgaloreInputFiles} -o ${TRIMGALORE_WORKSPACE_PATH}
+  [ ! -z ${DRY_RUN} ] || ${TRIMGALORE_PATH} --paired -q ${TRIMGALORE_PARAM_Q} ${trimgaloreInputFiles} -o ${TRIMGALORE_WORKSPACE_PATH}
 }
 
 function processFastQC(){
@@ -227,18 +227,25 @@ function processFastQC(){
 
 function getTrimgalorsResultsAsArray(){
   local -n inputFiles_=$1
-
+  echo "Processing getTrimgalorsResultsAsArray"
+  echo "${inputFiles_[@]}"
   for inputFile in "${inputFiles_[@]}"
   do
     #echo "inputFile: $inputFile"
     filename=$(basename $inputFile)
-    filenameNoExt="${filename%.*}"
-    filenameNoExt="${filenameNoExt%.*}"
+    filenameExt="${filename%.*}"
+    filenameNoExt="${filenameExt%.*}"
+    filenameNoExt2="${filenameNoExt%.*}" # still may have some extension.????
+    filenameMaybeNoExt=filenameNoExt
+    filenameNoExt=filenameNoExt2
+    echo "filename: ${filename} filenameNoExt: ${filenameNoExt} filenameExt: ${filenameExt}"
+
     #echo "filenameNoExt: ${filenameNoExt}"
     if [ -z `ls ${TRIMGALORE_WORKSPACE_PATH} | grep "trimmed" | grep ${filenameNoExt}` ] ; then
       #echo "noout"
       continue
     fi
+
     mayBeTrimmedFile=`ls ${TRIMGALORE_WORKSPACE_PATH}  | grep "trimmed" | grep ${filenameNoExt}`
     #echo "mayBeTrimmedFile:"
     #echo "mayBeTrimmedFile: ${mayBeTrimmedFile}"
@@ -246,7 +253,6 @@ function getTrimgalorsResultsAsArray(){
     #echo "trimmedFilePath: ${trimmedFilePath}"
     resultArray+=("${trimmedFilePath}")
   done
-
 }
 
 function processSeqtk(){
@@ -271,7 +277,8 @@ function processSeqtk(){
     SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${SEQTK_PARAM_PERCENTS}.fq
 
     echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
-    ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
+    echo "${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}"
+    [ ! -z ${DRY_RUN} ] || ${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}
 
   done
 }
@@ -285,8 +292,10 @@ function processVelvet(){
   # velveth_de
   #${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} 31 -fastq -shortPaired ${inputFilesString}
   #${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} -exp_cov auto
-  ${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}
-  ${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETG_PARAMS}
+  echo "${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}"
+  [ ! -z ${DRY_RUN} ] || ${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}
+  echo "${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETG_PARAMS}"
+  [ ! -z ${DRY_RUN} ] || ${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETG_PARAMS}
   # was -exp_cov 19 byt metavelvet needs -exp_cov auto
 }
 
@@ -310,15 +319,15 @@ function processDiamond(){
     # convert fq to fa
     if [ ! -f "${inputFile_%.*}.fa" ] ; then
       echo "Converting ${inputFile_%.*}.fq to ${inputFile_%.*}.fa"
-      sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa
+      [ ! -z ${DRY_RUN} ] || sed -n '1~4s/^@/>/p;2~4p' ${inputFile_%.*}.fq > ${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa
       #${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa
       inputFile_="${DIAMOND_WORKSPACE_PATH}/${inputFile_%.*}.fa"
       resultArray+=("${inputFile_}")
     fi
-
+    echo "resultArray: ${resultArray[@]}"
     echo "Starting diamond blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} >  ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log"
 
-    ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
+    [ ! -z ${DRY_RUN} ] || ${DIAMOND_PATH} blastx -d ${NR_DMND_FILE_PATH} -q ${inputFile_} -o ${DIAMOND_WORKSPACE_PATH}/matches-${filename}${PARAMTERES_EXT}.m8 -f ${DIAMOND_PARAM_F} -b${DIAMOND_PARAM_B} -p ${DIAMOND_PARAM_PROCESSES} > ${DIAMOND_WORKSPACE_PATH}/diamond-${filename}${PARAMTERES_EXT}.log
   done
 }
 
@@ -326,67 +335,64 @@ function processMegan6(){
   echo "Megan6"
 }
 
-function containsElement {
-  ARRAY=$2
-  for e in ${ARRAY[*]}
-  do
-    if [[ "$e" == "$1" ]]
-    then
-      return 0
-    fi
-  done
+containsElement () {
+  local e match="$1"
+  shift
+  for e; do [[ "$e" == "$match" ]] && return 0; done
   return 1
 }
 
 # this is the main method that runs everything
-function run()
+run()
 {
   parse_args "$@"
   loadWorkspace
   echoParameters
   if [[ -z ${doProcess} ]] ; then
-    doProcess=( trimgalore seqtk velvet metaVelvet diamond megan6 )
+    doProcess=("trimgalore" "seqtk" "velvet" "metaVelvet" "diamond" "megan6")
   fi
+  echo "new doProcess: ${doProcess[@]}"
 
-  if containsElement ${doProcess} "trimgalore"; then
+  if containsElement "trimgalore" "${doProcess[@]}"; then
     # TODO better way how to say that there is just one readCount?
     globalReadsCount=$(getReadsCount ${inputFiles[0]})
-
     # TODO fix
     processTrimGalore inputFiles
+
+    # get reuslt files to push them into pipeline - TODO test
+    getTrimgalorsResultsAsArray inputFiles
   fi
 
-  if containsElement ${doProcess} "fastqc"; then
+  if containsElement "fastqc" "${doProcess[@]}" ; then
     # TODO FASTQC
     #processFastQC
     echo "Not processing FastQC"
   fi
 
-  # get reuslt files to push them into pipeline - TODO test
-  getTrimgalorsResultsAsArray inputFiles
+
 
   #copy the array in another one
   trimmedInputFiles=("${resultArray[@]}")
-  if containsElement "seqtk" ${doProcess}; then
+  if containsElement "seqtk" "${doProcess[@]}"; then
     processSeqtk trimmedInputFiles globalReadsCount
   fi
 
-  if containsElement ${doProcess} "velvet" ; then
+  if containsElement "velvet" "${doProcess[@]}"; then
     processVelvet inputFiles
   fi
 
   # pairs
-  if containsElement ${doProcess} "metaVelvet" ; then
+  if containsElement "metaVelvet" "${doProcess[@]}"; then
     processMetaVelvet inputFiles
   fi
 
-  if containsElement ${doProcess} "diamond"; then
+  if containsElement "diamond" "${doProcess[@]}"; then
     processDiamond inputFiles
     # update input files to use .fa?
     #inputFiles = ("${resultArray[@]}")
   fi
 
-  if containsElement ${doProcess} "megan6" ; then
+  if containsElement "megan6" "${doProcess[@]}"; then
     processMegan6 inputFiles
   fi
 
