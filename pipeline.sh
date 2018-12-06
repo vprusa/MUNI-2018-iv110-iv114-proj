@@ -258,7 +258,7 @@ function getTrimgalorsResultsAsArray(){
 function processSeqtk(){
   local -n inputFiles_=$1
   local -n globalReadsCount_=$2
-
+  echo "processing processSeqtk" 
   backupWorkspace ${SEQTK_WORKSPACE_PATH}
 
   for inputFile_ in "${inputFiles_[@]}"
