@@ -301,7 +301,14 @@ function processVelvet(){
 }
 
 function processMetaVelvet(){
-  echo "MetaVelvet"
+  local -n inputFiles_=$1
+  echo "processing MetaVelvet"
+
+  backupWorkspace ${METAVELVET_WORKSPACE_PATH}
+
+  # MetaVelvet-1.2.02/meta-velvetg contigs -ins_length 500
+  echo "${METAVELVETG_PATH} ${METAVELVETG_PARAMS}"
+  [ ! -z ${DRY_RUN} ] || ${METAVELVETG_PATH} ${METAVELVETG_PARAMS} > tee  ${METAVELVET_WORKSPACE_PATH}/current.log
 }
 
 function processDiamond(){
