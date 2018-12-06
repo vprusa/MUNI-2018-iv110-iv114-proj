@@ -377,10 +377,12 @@ run()
     echo "Not processing FastQC"
   fi
 
-
-
   #copy the array in another one
-  trimmedInputFiles=("${resultArray[@]}")
+  if [ -z "${resultArray[@]}" ] ; then
+    trimmedInputFiles=inputFiles
+  else
+    trimmedInputFiles=("${resultArray[@]}")
+  fi
   if containsElement "seqtk" "${doProcess[@]}"; then
     processSeqtk trimmedInputFiles globalReadsCount
   fi
