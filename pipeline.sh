@@ -182,11 +182,11 @@ function echoDateTime(){
 
 function backupWorkspace(){
   local workspacePath=$1
-
+  dateTimeStr=`echoDateTime`
   if [ -d ${workspacePath} ]; then
     # TODO add flag that will remove old if exists, also use one echoDateTime across whole script run
-    echo "File ${workspacePath} already exists - backing up"
-    mv ${workspacePath} "${workspacePath}.bkp.${DRY_RUN}."`echoDateTime`
+    echo "File ${workspacePath} already exists - backing up ${dateTimeStr}"
+    mv ${workspacePath} "${workspacePath}.bkp${DRY_RUN}.${dateTimeStr}"
     mkdir -p ${workspacePath}
   else
     mkdir -p ${workspacePath}
@@ -263,12 +263,14 @@ function processSeqtk(){
 
   for inputFile_ in "${inputFiles_[@]}"
   do
-    filename=$(basename -- "$inputFile_")
+    echo "InputFile: ${inputFile_}"
+    echo "InputFiles: ${inputFiles_[@]}"
+    filename=$(basename -- "${inputFile_}")
     extension="${filename##*.}"
     filenameNoExt="${filename%.*}"
     if [ -z ${SEQTK_PARAM_SEQ_VALUE} ] ; then
       if [ ! -z ${globalReadsCount_+x} ] ; then
-        readsCount=$globalReadsCount_
+        readsCount=${globalReadsCount_}
       else
         readsCount=$(getReadsCount ${inputFile_})
       fi
@@ -383,7 +385,7 @@ run()
 
   #copy the array in another one
   if [ -z "${resultArray[@]}" ] ; then
-    trimmedInputFiles=inputFiles
+    trimmedInputFiles=("${inputFiles[@]}")
   else
     trimmedInputFiles=("${resultArray[@]}")
   fi
