@@ -257,7 +257,7 @@ function getTrimgalorsResultsAsArray(){
 
 function processSeqtk(){
   local -n inputFiles_=$1
-  local -n globalReadsCount_=$2
+  #local -n globalReadsCount_=$2
   echo "processing processSeqtk"
   backupWorkspace ${SEQTK_WORKSPACE_PATH}
 
@@ -266,19 +266,19 @@ function processSeqtk(){
     filename=$(basename -- "$inputFile_")
     extension="${filename##*.}"
     filenameNoExt="${filename%.*}"
-    if [ ! -z ${globalReadsCount_+x} ] ; then
-      readsCount=$globalReadsCount_
-    else
-      readsCount=$(getReadsCount ${inputFile_})
-    fi
-    if [ -z ${SEQTK_PARAM_SEQ_VALUE} ] ;
+    if [ -z ${SEQTK_PARAM_SEQ_VALUE} ] ; then
+      if [ ! -z ${globalReadsCount_+x} ] ; then
+        readsCount=$globalReadsCount_
+      else
+        readsCount=$(getReadsCount ${inputFile_})
+      fi
       expr="scale = 4; ${readsCount} * ${SEQTK_PARAM_PERCENTS}/100"
       seqCount=$(bc -l <<< $expr)
     else
       seqCount=${SEQTK_PARAM_SEQ_VALUE}
-      SEQTK_PARAM_SEQ_VALUE=${SEQTK_PARAM_SEQ_VALUE}
     fi
-    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${SEQTK_PARAM_PERCENTS}.fq
+    SEQTK_INFO=${seqCount}
+    SEQTK_OUTPUT_FILE_PATH=${SEQTK_WORKSPACE_PATH}/${filenameNoExt}-seqtk-${SEQTK_INFO}.fq
 
     echo "Executing seqtk for file: ${inputFile} > ${SEQTK_OUTPUT_FILE_PATH}"
     echo "${SEQTK_PATH} sample -s100 ${inputFile} ${seqCount} > ${SEQTK_OUTPUT_FILE_PATH}"
@@ -388,6 +388,7 @@ run()
     trimmedInputFiles=("${resultArray[@]}")
   fi
   if containsElement "seqtk" "${doProcess[@]}"; then
+    #processSeqtk trimmedInputFiles globalReadsCount
     processSeqtk trimmedInputFiles globalReadsCount
   fi
 
