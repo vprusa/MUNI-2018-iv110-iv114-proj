@@ -20,4 +20,12 @@ This project is example of pipeline using:
 ./pipeline.sh -p properties-biolinux.properties -i ./../data/original/SRR6000947_1.fastq.gz -i ./../data/original/SRR6000947_2.fastq.gz &> current.log &
 ```
 
+
+```
+./pipeline.sh -p properties-biolinux.properties -i ../data/auto/trimgalore-results/SRR6000947_1_val_1.fq.gz -i ../data/auto/trimgalore-results/SRR6000947_2_val_2.fq.gz -d "seqtk" -d "velvet" -d "metaVelvet" -d "diamond" -d "megan6" &> current.log &
+```
+
+
+
+
 Use ```{[<-d|--do> <trimgalor|seqtk|fastqc>] ...}``` to select just certain steps(SW) and thus avoid unnecessary processes and reuse already generated files (not using SW workspace backup).

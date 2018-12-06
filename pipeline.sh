@@ -288,10 +288,11 @@ function processVelvet(){
 
   backupWorkspace ${VELVET_WORKSPACE_PATH}
 
-  inputFilesString=$( IFS=$'\n'; echo "${inputFiles_[*]}" )
+  inputFilesString=$( IFS=$' '; echo "${inputFiles_[*]}" )
   # velveth_de
   #${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} 31 -fastq -shortPaired ${inputFilesString}
   #${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} -exp_cov auto
+
   echo "${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}"
   [ ! -z ${DRY_RUN} ] || ${VELVETH_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETH_PARAMS} ${inputFilesString}
   echo "${VELVETG_PATH} ${VELVET_WORKSPACE_PATH} ${VELVETG_PARAMS}"
@@ -360,8 +361,8 @@ run()
     processTrimGalore inputFiles
 
     # get reuslt files to push them into pipeline - TODO test
+    getTrimgalorsResultsAsArray inputFiles
   fi
-  getTrimgalorsResultsAsArray inputFiles
 
   if containsElement "fastqc" "${doProcess[@]}" ; then
     # TODO FASTQC
