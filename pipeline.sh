@@ -360,8 +360,8 @@ run()
     processTrimGalore inputFiles
 
     # get reuslt files to push them into pipeline - TODO test
-    getTrimgalorsResultsAsArray inputFiles
   fi
+  getTrimgalorsResultsAsArray inputFiles
 
   if containsElement "fastqc" "${doProcess[@]}" ; then
     # TODO FASTQC
