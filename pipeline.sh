@@ -310,11 +310,12 @@ function processMetaVelvet(){
   local -n inputFiles_=$1
   echo "processing MetaVelvet"
 
-  backupWorkspace ${METAVELVET_WORKSPACE_PATH}
+  #backupWorkspace ${METAVELVET_WORKSPACE_PATH}
+  #cp -r ${VELVET_WORKSPACE_PATH}/* ${METAVELVET_WORKSPACE_PATH}/
 
   # MetaVelvet-1.2.02/meta-velvetg contigs -ins_length 500
-  echo "${METAVELVETG_PATH} ${METAVELVETG_PARAMS}"
-  [ ! -z ${DRY_RUN} ] || ${METAVELVETG_PATH} ${METAVELVETG_PARAMS} > tee  ${METAVELVET_WORKSPACE_PATH}/current.log
+  echo "${METAVELVETG_PATH} ${METAVELVET_WORKSPACE_PATH} ${METAVELVETG_PARAMS}"
+  [ ! -z ${DRY_RUN} ] || ${METAVELVETG_PATH} ${METAVELVET_WORKSPACE_PATH} ${METAVELVETG_PARAMS} | tee  ${METAVELVET_WORKSPACE_PATH}/current.log
 }
 
 function processDiamond(){
@@ -382,7 +383,8 @@ run()
     #processFastQC
     echo "Not processing FastQC"
   fi
-
+  
+  #TODO fix getTrimgalorsResultsAsArray not getting right data when used trimgalore->seqtk ..
   #copy the array in another one
   if [ -z "${resultArray[@]}" ] ; then
     trimmedInputFiles=("${inputFiles[@]}")
