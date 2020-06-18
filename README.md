@@ -10,6 +10,10 @@ This project is example of pipeline using:
 - [Diamond](https://github.com/bbuchfink/diamond/)
 - etc.?
 
+### Results
+
+[Presentation](https://docs.google.com/presentation/d/1wQC_K8S8MH2UE6524UuKI-tq8SI91_7oiLgnu8QuvkE/edit)
+
 ### Example
 
 ```
